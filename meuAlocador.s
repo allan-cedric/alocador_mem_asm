@@ -68,77 +68,89 @@ alocaMem:
     movq    HEAP_TOP, %r15          # %r15 := HEAP_TOP
 
     addq    $16, %r12               # Endereço do possível primeiro bloco
+    movq    $0, %rax
     while:
         cmpq    %r13, %r12          # Estourou HEAP_POINTER ?
-        jge     criaBloco
+        jge     fimWhile
 
         movq    -16(%r12), %r8      # Estado do bloco atual
         movq    -8(%r12), %r9       # Tamanho do bloco atual
 
-        cmpq    $1, %r8             # Bloco está ocupado ?
+        cmpq    $1, %r8             # Se bloco está ocupado, pula pra next
         je      next
 
-        cmpq    %r14, %r9           # sizeof(bloco atual) < sizeof(bloco pedido) ?
+        cmpq    %r14, %r9           # Se sizeof(bloco atual) < sizeof(bloco pedido), pula pra next
         jl      next
 
-        movq    %r12, %rax          # Endereço do novo bloco
-        movq    $1, -16(%rax)       # Bloco está ocupado agora
-        jmp     fimAlocaMem
+        cmpq    $0, %rax            # Se for o primeiro bloco válido, realiza FirstFit direto
+        je      fit
 
+        cmpq    %rbx, %r9           # Se sizeof(bloco atual) >= sizeof(bloco candidato), pula pra next
+        jge     next
+    
+        fit:
+            movq    %r9, %rbx
+            movq    %r12, %rax      # Endereço do novo bloco
         next:
             addq    %r9, %r12       # %r12 := %r12 + sizeof(bloco atual) 
             addq    $16, %r12       # %r12 := %r12 + sizeof(header)
             jmp     while
-
-criaBloco:
-    addq    %r14, %r12              # %r12 := (HEAP_POINTER + sizeof(header)) + sizeof(bloco pedido)
     
-    cmpq    HEAP_TOP, %r12          # %r12 > HEAP_TOP ?
-    jg      aloca
+    fimWhile:
+        cmpq    $0, %rax
+        je      criaBloco
+        movq    $1, -16(%rax)       # Bloco está ocupado agora
+        jmp     fimAlocaMem
 
-    movq    %r12, HEAP_POINTER      # Atualiza HEAP_POINTER
-    subq    %r14, %r12              
-    movq    %r12, %rax              # Endereço do novo bloco (retorno)
-    
-    movq    $1, -16(%rax)           # Bloco está ocupado agora
-    movq    %r14, -8(%rax)          # Tamanho do novo bloco
-    jmp     fimAlocaMem
-
-
-aloca:
-    addq    $16, %rdi           # %rdi := sizeof(header + bloco pedido)
-    movq    $4096, %r10         # Página a ser alocada
-
-    while1:
-        cmpq    %r10, %rdi          # %rdi <= %r10 ?
-        jle     fimWhile1
-        addq    $4096, %r10
-        jmp     while1
-
-    fimWhile1:
-        movq    $12, %rax           # Syscall brk
-        addq    %r15, %r10          # %r10 := tamanho da página + HEAP_TOP
-        movq    %r10, %rdi
-        syscall                     # brk(tamanho da página + HEAP_TOP)
+    criaBloco:
+        addq    %r14, %r12              # %r12 := (HEAP_POINTER + sizeof(header)) + sizeof(bloco pedido)
         
-        movq    %rax, HEAP_TOP      # HEAP_TOP := brk(tamanho da página + HEAP_TOP)     
-        movq    %r13, %rax          # %rax := $HEAP_POINTER (Anterior)
+        cmpq    HEAP_TOP, %r12          # %r12 > HEAP_TOP ?
+        jg      aloca
+
+        movq    %r12, HEAP_POINTER      # Atualiza HEAP_POINTER
+        subq    %r14, %r12              
+        movq    %r12, %rax              # Endereço do novo bloco (retorno)
         
-        addq    $16, %r13
-        addq    %r14, %r13
-        movq    %r13, HEAP_POINTER           
+        movq    $1, -16(%rax)           # Bloco está ocupado agora
+        movq    %r14, -8(%rax)          # Tamanho do novo bloco
+        jmp     fimAlocaMem
 
-        movq    $1, (%rax)          # Bloco está ocupado agora
-        movq    %r14, 8(%rax)       # Tamanho do bloco
-        addq    $16, %rax           # Endereço do novo bloco
 
-fimAlocaMem:
-    popq   %r15
-    popq   %r14
-    popq   %r13
-    popq   %r12
-    popq   %rbp                # Restaura %rbp e desempilha %rbp anterior   
-    ret
+    aloca:
+        addq    $16, %rdi           # %rdi := sizeof(header + bloco pedido)
+        movq    $4096, %r10         # Página a ser alocada
+
+        while1:
+            cmpq    %r10, %rdi          # %rdi <= %r10 ?
+            jle     fimWhile1
+            addq    $4096, %r10
+            jmp     while1
+
+        fimWhile1:
+            movq    $12, %rax           # Syscall brk
+            addq    %r15, %r10          # %r10 := tamanho da página + HEAP_TOP
+            movq    %r10, %rdi
+            syscall                     # brk(tamanho da página + HEAP_TOP)
+            
+            movq    %rax, HEAP_TOP      # HEAP_TOP := brk(tamanho da página + HEAP_TOP)     
+            movq    %r13, %rax          # %rax := $HEAP_POINTER (Anterior)
+            
+            addq    $16, %r13
+            addq    %r14, %r13
+            movq    %r13, HEAP_POINTER           
+
+            movq    $1, (%rax)          # Bloco está ocupado agora
+            movq    %r14, 8(%rax)       # Tamanho do bloco
+            addq    $16, %rax           # Endereço do novo bloco
+
+    fimAlocaMem:
+        popq   %r15
+        popq   %r14
+        popq   %r13
+        popq   %r12
+        popq   %rbp                # Restaura %rbp e desempilha %rbp anterior   
+        ret
 
 # ----- liberaMem -----
 liberaMem:
@@ -193,7 +205,7 @@ alocado:
 
         while2:
             cmpq    -8(%r12), %r15      # %r15 >= sizeof(bloco) ?
-            jge      nextBloco
+            jge     nextBloco
             movq    %r13, %rdi
             call    putchar             # putchar(%r13)
             addq    $1, %r15
