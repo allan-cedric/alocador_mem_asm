@@ -68,7 +68,7 @@ alocaMem:
     movq    HEAP_TOP, %r15          # %r15 := HEAP_TOP
 
     addq    $16, %r12               # Endereço do possível primeiro bloco
-    movq    $0, %rax
+    movq    $0, %rax                # Endereço do melhor bloco para alocar
     while:
         cmpq    %r13, %r12          # Estourou HEAP_POINTER ?
         jge     fimWhile
@@ -89,15 +89,16 @@ alocaMem:
         jge     next
     
         fit:
-            movq    %r9, %rbx
-            movq    %r12, %rax      # Endereço do novo bloco
+            movq    %r9, %rbx       # Tamanho do bloco candidato
+            movq    %r12, %rax      # Endereço do novo bloco candidato
+
         next:
             addq    %r9, %r12       # %r12 := %r12 + sizeof(bloco atual) 
             addq    $16, %r12       # %r12 := %r12 + sizeof(header)
             jmp     while
     
     fimWhile:
-        cmpq    $0, %rax
+        cmpq    $0, %rax            # Se %rax é 0, pula pra criaBloco
         je      criaBloco
         movq    $1, -16(%rax)       # Bloco está ocupado agora
         jmp     fimAlocaMem
@@ -105,24 +106,23 @@ alocaMem:
     criaBloco:
         addq    %r14, %r12              # %r12 := (HEAP_POINTER + sizeof(header)) + sizeof(bloco pedido)
         
-        cmpq    HEAP_TOP, %r12          # %r12 > HEAP_TOP ?
+        cmpq    HEAP_TOP, %r12          # Se %r12 > HEAP_TOP, pula pra aloca
         jg      aloca
 
         movq    %r12, HEAP_POINTER      # Atualiza HEAP_POINTER
         subq    %r14, %r12              
-        movq    %r12, %rax              # Endereço do novo bloco (retorno)
+        movq    %r12, %rax              # Endereço do novo bloco
         
         movq    $1, -16(%rax)           # Bloco está ocupado agora
         movq    %r14, -8(%rax)          # Tamanho do novo bloco
         jmp     fimAlocaMem
-
 
     aloca:
         addq    $16, %rdi           # %rdi := sizeof(header + bloco pedido)
         movq    $4096, %r10         # Página a ser alocada
 
         while1:
-            cmpq    %r10, %rdi          # %rdi <= %r10 ?
+            cmpq    %r10, %rdi          # Se sizeof(bloco) <= sizeof(página), pula pra fimWhile1
             jle     fimWhile1
             addq    $4096, %r10
             jmp     while1
@@ -138,7 +138,7 @@ alocaMem:
             
             addq    $16, %r13
             addq    %r14, %r13
-            movq    %r13, HEAP_POINTER           
+            movq    %r13, HEAP_POINTER  # Atualiza HEAP_POINTER         
 
             movq    $1, (%rax)          # Bloco está ocupado agora
             movq    %r14, 8(%rax)       # Tamanho do bloco
@@ -149,7 +149,7 @@ alocaMem:
         popq   %r14
         popq   %r13
         popq   %r12
-        popq   %rbp                # Restaura %rbp e desempilha %rbp anterior   
+        popq   %rbp                     # Restaura %rbp e desempilha %rbp anterior   
         ret
 
 # ----- liberaMem -----
@@ -174,67 +174,61 @@ imprimeMapa:
 
     movq    HEAP_BOTTOM, %r12   # %r12 := HEAP_BOTTOM
 
-alocado:
-    cmpq    HEAP_POINTER, %r12  # %r12 == HEAP_POINTER ?
-    je      disponivel
+    alocado:
+        cmpq    HEAP_POINTER, %r12  # Estourou HEAP_POINTER ?
+        je      disponivel
 
-    # Avaliando novo bloco
-    movq    $0, %r15
-    for:
-        cmpq    $16, %r15
-        jge     fimFor
-
-        movq    $GER_FLAG, %rdi
-        call    putchar
-        addq    $1, %r15
-
-        jmp     for
-
-
-    fimFor:
-        addq    $16, %r12               # Endereço do bloco atual 
-
-        cmpq    $1, -16(%r12)           # Bloco está ocupado ?
-        je      else
-        movq    $LIVRE_FLAG, %r13       # Char de bloco livre
-        jmp     endIf
-        else:
-            movq    $OCUPADO_FLAG, %r13 # Char de bloco ocupado
-        endIf:
-            movq    $0, %r15
-
-        while2:
-            cmpq    -8(%r12), %r15      # %r15 >= sizeof(bloco) ?
-            jge     nextBloco
-            movq    %r13, %rdi
-            call    putchar             # putchar(%r13)
+        # Avaliando novo bloco
+        movq    $0, %r15
+        for:
+            cmpq    $16, %r15
+            jge     fimFor
+            movq    $GER_FLAG, %rdi
+            call    putchar         # putchar('#')
             addq    $1, %r15
-            jmp     while2
+            jmp     for
+
+        fimFor:
+            addq    $16, %r12               # Endereço do bloco atual
+
+            cmpq    $1, -16(%r12)           # Bloco está ocupado ?
+            je      else
+            movq    $LIVRE_FLAG, %r13       # Char de bloco livre
+            jmp     endIf
+            else:
+                movq    $OCUPADO_FLAG, %r13 # Char de bloco ocupado
+            endIf:
+                movq    $0, %r15
+
+            while2:
+                cmpq    -8(%r12), %r15      # %r15 >= sizeof(bloco) ?
+                jge     nextBloco
+                movq    %r13, %rdi
+                call    putchar             # putchar(%r13)
+                addq    $1, %r15
+                jmp     while2
+            
+        nextBloco:
+            movq    -8(%r12), %rsi          # %rsi := sizeof(bloco)
+            addq    %rsi, %r12              # %r12 := %r12 + sizeof(bloco)
+            jmp     alocado
+
+    disponivel: # Área da heap alocada mas não usada
+        cmpq    HEAP_TOP, %r12           
+        jge     fimImprimeMapa
+        movq    $DIPS_FLAG, %rdi
+        call    putchar             # putchar('*')
+        addq    $1, %r12
+        jmp     disponivel
+
+    fimImprimeMapa:
+        movq    $10, %rdi
+        call    putchar             # putchar('\n')
+        movq    $10, %rdi           
+        call    putchar             # putchar('\n')
         
-    nextBloco:
-        movq    -8(%r12), %rsi          # %rsi := sizeof(bloco)
-        addq    %rsi, %r12              # %r12 := %r12 + sizeof(bloco)
-        jmp     alocado
-
-disponivel: # Área da heap alocada mas sem blocos
-    cmpq    HEAP_TOP, %r12           
-    jge     fimImprimeMapa
-
-    movq    $DIPS_FLAG, %rdi
-    call    putchar
-
-    addq    $1, %r12
-    jmp     disponivel
-
-fimImprimeMapa:
-    # Imprime 2 '\n'
-    movq    $10, %rdi
-    call    putchar
-    movq    $10, %rdi
-    call    putchar
-    
-    popq    %r15
-    popq    %r13
-    popq    %r12
-    popq    %rbp                # Restaura %rbp e desempilha %rbp anterior   
-    ret
+        popq    %r15
+        popq    %r13
+        popq    %r12
+        popq    %rbp                # Restaura %rbp e desempilha %rbp anterior   
+        ret
