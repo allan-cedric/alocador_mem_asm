@@ -19,13 +19,16 @@ int main()
   imprimeMapa();
 
   a = alocaMem(5);
-  b = alocaMem(3);
   printf("mapa 3:\n");
+  imprimeMapa();
+
+  b = alocaMem(3);
+  printf("mapa 4:\n");
   imprimeMapa();
 
   liberaMem(a);
   liberaMem(b);
-  printf("mapa 4:\n");
+  printf("mapa 5:\n");
   imprimeMapa();
 
   finalizaAlocador();
