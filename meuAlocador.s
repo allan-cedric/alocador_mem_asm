@@ -6,7 +6,7 @@
 
 # ----- Constantes -----      
 .equ    GER_FLAG,       35      # ASCII Char: '#'
-.equ    DIPS_FLAG,      42      # ASCII Char: '*'   
+.equ    DISP_FLAG,      63      # ASCII Char: '?'   
 .equ    OCUPADO_FLAG,   43      # ASCII Char: '+'
 .equ    LIVRE_FLAG,     45      # ASCII Char: '-'
 
@@ -134,7 +134,7 @@ alocaMem:
             syscall                     # brk(tamanho da página + HEAP_TOP)
             
             movq    %rax, HEAP_TOP      # HEAP_TOP := brk(tamanho da página + HEAP_TOP)     
-            movq    %r13, %rax          # %rax := $HEAP_POINTER (Anterior)
+            movq    %r13, %rax          # %rax := HEAP_POINTER (Anterior)
             
             addq    $16, %r13
             addq    %r14, %r13
@@ -216,7 +216,7 @@ imprimeMapa:
     disponivel: # Área da heap alocada mas não usada
         cmpq    HEAP_TOP, %r12           
         jge     fimImprimeMapa
-        movq    $DIPS_FLAG, %rdi
+        movq    $DISP_FLAG, %rdi
         call    putchar             # putchar('*')
         addq    $1, %r12
         jmp     disponivel
