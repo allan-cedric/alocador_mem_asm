@@ -2,11 +2,11 @@
     HEAP_BOTTOM:    .quad   0       # Altura inicial da heap
     HEAP_POINTER:   .quad   0       # Altura efetiva da heap
     HEAP_TOP:       .quad   0       # Altura máxima da heap
-    EMPTY_STR:      .string ""
+    FEED_LINE:      .string "\n"
 
 # ----- Constantes -----      
 .equ    GER_FLAG,       35      # ASCII Char: '#'
-.equ    DISP_FLAG,      63      # ASCII Char: '?'   
+.equ    DISP_FLAG,      46      # ASCII Char: '.'   
 .equ    OCUPADO_FLAG,   43      # ASCII Char: '+'
 .equ    LIVRE_FLAG,     45      # ASCII Char: '-'
 
@@ -25,7 +25,7 @@ iniciaAlocador:
     pushq   %rbp                # Empilha %rbp
     movq    %rsp, %rbp          # %rbp aponta para o %rbp anterior
 
-    movq    $EMPTY_STR, %rdi    
+    movq    $FEED_LINE, %rdi    
     call    printf              # Buffer de impressão alocado
 
     movq    $12, %rax           # Syscall brk
