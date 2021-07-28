@@ -2,9 +2,10 @@
     HEAP_BOTTOM:    .quad   0       # Altura inicial da heap
     HEAP_POINTER:   .quad   0       # Altura efetiva da heap
     HEAP_TOP:       .quad   0       # Altura máxima da heap
-    FEED_LINE:      .string "\n"
+    LINE_FEED:      .string "\n"
 
-# ----- Constantes -----      
+# ----- Constantes -----
+.equ    BRK,            12      # Syscall brk ID      
 .equ    GER_FLAG,       35      # ASCII Char: '#'
 .equ    DISP_FLAG,      46      # ASCII Char: '.'   
 .equ    OCUPADO_FLAG,   43      # ASCII Char: '+'
@@ -25,10 +26,10 @@ iniciaAlocador:
     pushq   %rbp                # Empilha %rbp
     movq    %rsp, %rbp          # %rbp aponta para o %rbp anterior
 
-    movq    $FEED_LINE, %rdi    
+    movq    $LINE_FEED, %rdi    
     call    printf              # Buffer de impressão alocado
 
-    movq    $12, %rax           # Syscall brk
+    movq    $BRK, %rax          # Syscall brk
     movq    $0, %rdi
     syscall                     # brk(0)
 
@@ -44,7 +45,7 @@ finalizaAlocador:
     pushq   %rbp                # Empilha %rbp
     movq    %rsp, %rbp          # %rbp aponta para o %rbp anterior
 
-    movq    $12, %rax           # Syscall brk
+    movq    $BRK, %rax          # Syscall brk
     movq    HEAP_BOTTOM, %rdi
     syscall                     # brk(HEAP_BOTTOM)
 
@@ -70,11 +71,11 @@ alocaMem:
     addq    $16, %r12               # Endereço do possível primeiro bloco
     movq    $0, %rax                # Endereço do melhor bloco para alocar
     while:
-        cmpq    %r13, %r12          # Estourou HEAP_POINTER ?
+        cmpq    %r13, %r12          # Se %r12 >= HEAP_POINTER, pula pra fimWhile
         jge     fimWhile
 
-        movq    -16(%r12), %r8      # Estado do bloco atual
-        movq    -8(%r12), %r9       # Tamanho do bloco atual
+        movq    -16(%r12), %r8      # %r8 := Estado do bloco atual
+        movq    -8(%r12), %r9       # %r9 := Tamanho do bloco atual
 
         cmpq    $1, %r8             # Se bloco está ocupado, pula pra next
         je      next
@@ -89,8 +90,8 @@ alocaMem:
         jge     next
     
         fit:
-            movq    %r9, %rbx       # Tamanho do bloco candidato
-            movq    %r12, %rax      # Endereço do novo bloco candidato
+            movq    %r9, %rbx       # %rbx := Tamanho do bloco candidato
+            movq    %r12, %rax      # %rax := Endereço do novo bloco candidato
 
         next:
             addq    %r9, %r12       # %r12 := %r12 + sizeof(bloco atual) 
@@ -119,7 +120,7 @@ alocaMem:
 
     aloca:
         addq    $16, %rdi           # %rdi := sizeof(header + bloco pedido)
-        movq    $4096, %r10         # Página a ser alocada
+        movq    $4096, %r10         # %r10 := Página(s) a ser alocada
 
         while1:
             cmpq    %r10, %rdi          # Se sizeof(bloco) <= sizeof(página), pula pra fimWhile1
@@ -128,16 +129,16 @@ alocaMem:
             jmp     while1
 
         fimWhile1:
-            movq    $12, %rax           # Syscall brk
-            addq    %r15, %r10          # %r10 := tamanho da página + HEAP_TOP
+            movq    $BRK, %rax          # Syscall brk
+            addq    %r15, %r10          # %r10 := %r10 + HEAP_TOP
             movq    %r10, %rdi
-            syscall                     # brk(tamanho da página + HEAP_TOP)
+            syscall                     # brk(%r10)
             
-            movq    %rax, HEAP_TOP      # HEAP_TOP := brk(tamanho da página + HEAP_TOP)     
+            movq    %rax, HEAP_TOP      # HEAP_TOP := brk(%r10)     
             movq    %r13, %rax          # %rax := HEAP_POINTER (Anterior)
             
-            addq    $16, %r13
-            addq    %r14, %r13
+            addq    $16, %r13           # %r13 := %r13 + sizeof(header)
+            addq    %r14, %r13          # %r13 := %r13 + sizeof(bloco pedido)
             movq    %r13, HEAP_POINTER  # Atualiza HEAP_POINTER         
 
             movq    $1, (%rax)          # Bloco está ocupado agora
@@ -175,17 +176,17 @@ imprimeMapa:
     movq    HEAP_BOTTOM, %r12   # %r12 := HEAP_BOTTOM
 
     alocado:
-        cmpq    HEAP_POINTER, %r12  # Estourou HEAP_POINTER ?
-        je      disponivel
+        cmpq    HEAP_POINTER, %r12  # Se %r12 == HEAP_POINTER, pula pra fimImprimeMapa
+        je      fimImprimeMapa
 
         # Avaliando novo bloco
         movq    $0, %r15
         for:
-            cmpq    $16, %r15
+            cmpq    $16, %r15       # Se %r15 >= 16, pula pra fimFor
             jge     fimFor
             movq    $GER_FLAG, %rdi
             call    putchar         # putchar('#')
-            addq    $1, %r15
+            addq    $1, %r15        # %r15 := %r15 + 1
             jmp     for
 
         fimFor:
@@ -201,11 +202,11 @@ imprimeMapa:
                 movq    $0, %r15
 
             while2:
-                cmpq    -8(%r12), %r15      # %r15 >= sizeof(bloco) ?
+                cmpq    -8(%r12), %r15      # Se %r15 >= sizeof(bloco), pula pra nextBloco
                 jge     nextBloco
                 movq    %r13, %rdi
                 call    putchar             # putchar(%r13)
-                addq    $1, %r15
+                addq    $1, %r15            # %r15 := %r15 + 1
                 jmp     while2
             
         nextBloco:
@@ -213,7 +214,7 @@ imprimeMapa:
             addq    %rsi, %r12              # %r12 := %r12 + sizeof(bloco)
             jmp     alocado
 
-    disponivel: # Área da heap alocada mas não usada
+    disponivel: # Área da heap alocada mas não usada (opcional)
         cmpq    HEAP_TOP, %r12           
         jge     fimImprimeMapa
         movq    $DISP_FLAG, %rdi
