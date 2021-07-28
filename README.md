@@ -13,5 +13,10 @@
 *   `finalizaAlocador`: Restaura a variável `brk`, basicamente restaura para área inicial da heap.
 *   `alocaMem`: Aloca memória na heap, ajustando se necessário a variável `brk` sob demanda em páginas múltiplas de 4096 bytes. O algoritmo de alocação utilizado foi o **Best Fit**.
 *   `liberaMem`: Libera memória da heap, basicamente torna um bloco da heap livre através de uma flag gerencial.
-*   `imprimeMapa`: Imprime o mapa de memória da heap, os bytes gerenciais dos blocos são impressos com o caractere `#`, os bytes de dados com `+` se ocupados e `-` se livres. **Ademais, os bytes alocados mas não utilizados são denotados por `.` (Opcional)**. 
+*   `imprimeMapa`: Imprime o mapa de memória da heap, os bytes gerenciais dos blocos são impressos com o caractere `#`, os bytes de dados com `+` se ocupados e `-` se livres. **Ademais, os bytes alocados mas não utilizados são denotados por `.` (Opcional)**.
+
+### Executando o projeto
+
+*   Compilação: `make`
+*   Execução: `./pgma`
 
